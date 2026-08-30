@@ -2,37 +2,47 @@
 
 Adapt [Cohere Transcribe Arabic](https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026) to Moroccan Darija with 3 hours of YouTube audio.
 
-**Model:** [`01Yassine/cohere-transcribe-darija`](https://huggingface.co/01Yassine/cohere-transcribe-darija)  
 **Train data:** [`01Yassine/darija-asr-3h`](https://huggingface.co/datasets/01Yassine/darija-asr-3h)  
 **Eval:** [`atlasia/darija-asr-benchmark`](https://huggingface.co/datasets/atlasia/darija-asr-benchmark) (114 clips, human)
 
-| | CER | WER |
-| --- | ---: | ---: |
-| Cohere Arabic, zero-shot | 20.2 | 49.1 |
-| **this adapter (`method`)** | **14.4** | **38.3** |
+## Open checkpoints
 
-Full writeup: [notebook.ipynb](notebook.ipynb). Zero-shot lineup: [reports/zeroshot.md](reports/zeroshot.md). Ablation: [reports/finetune.md](reports/finetune.md).
+All four recipes are public adapters on the Hub. Inference pulls the Cohere base, then the adapter.
 
-## Try it
+| recipe | Hub | CER | WER |
+| --- | --- | ---: | ---: |
+| **hybrid** (MultiConv + LoRA) | [`01Yassine/cohere-transcribe-darija`](https://huggingface.co/01Yassine/cohere-transcribe-darija) | **14.4** | **38.3** |
+| full LoRA | [`01Yassine/cohere-transcribe-darija-full-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-full-lora) | 16.5 | 40.3 |
+| encoder LoRA | [`01Yassine/cohere-transcribe-darija-encoder-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-encoder-lora) | 17.4 | 47.7 |
+| decoder LoRA | [`01Yassine/cohere-transcribe-darija-decoder-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-decoder-lora) | 20.2 | 45.1 |
+| base (no adapter) | [`CohereLabs/cohere-transcribe-arabic-07-2026`](https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026) | 20.2 | 49.1 |
 
-Needs `transformers>=5.4`, a GPU helps.
+Writeup: [notebook.ipynb](notebook.ipynb) · [zero-shot](reports/zeroshot.md) · [ablation](reports/finetune.md)
+
+## Inference from Hugging Face
 
 ```bash
 pip install "transformers>=5.4" peft torch torchaudio soundfile huggingface_hub
-python infer.py clip.wav
 ```
+
+No local checkpoint needed:
 
 ```python
+from huggingface_hub import snapshot_download
+import sys
+sys.path.insert(0, snapshot_download("01Yassine/cohere-transcribe-darija"))
 from infer import transcribe
 print(transcribe("clip.wav"))
+print(transcribe("clip.wav", model_id="full_lora"))
 ```
 
-That loads the Hub adapter on top of the Cohere base model.
-
-Local checkpoint instead:
+From this repo:
 
 ```bash
-python infer.py clip.wav --model checkpoints/cohere-method/best
+python infer.py clip.wav                      # hybrid
+python infer.py clip.wav --model full_lora
+python infer.py clip.wav --model encoder_lora
+python infer.py clip.wav --model decoder_lora
 ```
 
 ## Train
@@ -40,11 +50,9 @@ python infer.py clip.wav --model checkpoints/cohere-method/best
 ```bash
 export PYTHONPATH=$PWD PYTHONNOUSERSITE=1
 python -m src.prepare_data --from-hub
-python -m src.train_cohere --recipe method
-python scripts/eval_gold.py --model checkpoints/cohere-method/best --name method \
+python -m src.train_cohere --recipe method    # hybrid
+python scripts/eval_gold.py --model checkpoints/cohere-method/best --name hybrid \
   --out checkpoints/atlasia_eval/method.json
 ```
 
-Cluster: `bash scripts/srun_train_cohere.sh method` then `bash scripts/srun_eval_atlasia.sh method`.
-
-Recipes: `method` (conv adapter + decoder LoRA), `full_lora`, `encoder_lora`, `decoder_lora`.
+Cluster: `bash scripts/srun_train_cohere.sh method`

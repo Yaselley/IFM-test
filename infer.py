@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""Transcribe Darija audio with the adapted Cohere checkpoint.
+"""Darija ASR from a Hugging Face adapter repo.
+
+The adapter repo holds LoRA (and MultiConv weights if hybrid). The 2B
+Cohere base is pulled automatically.
 
     python infer.py clip.wav
-    python infer.py clip.wav --model checkpoints/cohere-method/best
-    python infer.py clip.wav --model 01Yassine/cohere-transcribe-darija
+    python infer.py clip.wav --model hybrid
+    python infer.py clip.wav --model 01Yassine/cohere-transcribe-darija-full-lora
+
+    from infer import transcribe
+    print(transcribe("clip.wav"))
+    print(transcribe("clip.wav", model_id="full_lora"))
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -18,10 +26,18 @@ import soundfile as sf
 import torch
 import torchaudio
 
-HUB_ID = "01Yassine/cohere-transcribe-darija"
 BASE_MODEL = "CohereLabs/cohere-transcribe-arabic-07-2026"
 SAMPLE_RATE = 16000
 LANGUAGE = "ar"
+
+# Short names → public adapter repos. Each ships infer.py + adapters.py.
+MODELS = {
+    "hybrid": "01Yassine/cohere-transcribe-darija",
+    "full_lora": "01Yassine/cohere-transcribe-darija-full-lora",
+    "encoder_lora": "01Yassine/cohere-transcribe-darija-encoder-lora",
+    "decoder_lora": "01Yassine/cohere-transcribe-darija-decoder-lora",
+}
+HUB_ID = MODELS["hybrid"]
 
 
 def _load_wav(path: str) -> np.ndarray:
@@ -35,53 +51,63 @@ def _load_wav(path: str) -> np.ndarray:
     return np.asarray(wav, dtype=np.float32)
 
 
-def _resolve(model_id: str) -> Path:
+def resolve_id(model_id: str) -> str:
+    return MODELS.get(model_id, model_id)
+
+
+def _snapshot(model_id: str) -> Path:
+    """Local dir, or download the Hub adapter repo (weights + adapters.py)."""
     local = Path(model_id)
-    if local.is_dir():
-        return local
+    if local.is_dir() and (local / "adapter_config.json").exists():
+        return local.resolve()
     from huggingface_hub import snapshot_download
 
-    return Path(snapshot_download(model_id))
+    return Path(snapshot_download(resolve_id(model_id)))
 
 
-def _attach(model, root: Path):
-    meta = json.loads((root / "adapter_meta.json").read_text())
-    try:
-        from src.adapters import attach_multiconv_adapters
-    except ImportError:
+def _attach_conv(model, root: Path, meta: dict) -> None:
+    if not meta.get("attached_layers") and not meta.get("conv_adapter"):
+        return
+    adapters_py = root / "adapters.py"
+    if adapters_py.exists():
         sys.path.insert(0, str(root))
-        from adapters import attach_multiconv_adapters  # type: ignore
+        attach = importlib.import_module("adapters").attach_multiconv_adapters
+    else:
+        from src.adapters import attach_multiconv_adapters as attach
 
-    if meta.get("attached_layers"):
-        attach_multiconv_adapters(
-            model,
-            bottleneck=meta["bottleneck"],
-            kernels=tuple(meta["kernels"]),
-            dropout=meta["dropout"],
-            skip_bottom_frac=meta.get("skip_bottom_frac", 0.33),
-            fusion=meta.get("fusion", "concat_fusion"),
-            merge_kernel=meta.get("merge_kernel", 31),
-        )
-    return meta
+    attach(
+        model,
+        bottleneck=meta["bottleneck"],
+        kernels=tuple(meta["kernels"]),
+        dropout=meta["dropout"],
+        skip_bottom_frac=meta.get("skip_bottom_frac", 0.33),
+        fusion=meta.get("fusion", "concat_fusion"),
+        merge_kernel=meta.get("merge_kernel", 31),
+    )
 
 
 def load_model(model_id: str = HUB_ID, device: str | None = None):
-    """Load base Cohere + conv adapters + decoder LoRA."""
+    """Load Cohere Arabic + this Hub adapter. No local training files needed."""
     from transformers import AutoProcessor, CohereAsrForConditionalGeneration
     from peft import PeftModel
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    root = _resolve(model_id)
+    root = _snapshot(model_id)
+    meta_path = root / "adapter_meta.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+
     processor = AutoProcessor.from_pretrained(BASE_MODEL)
     model = CohereAsrForConditionalGeneration.from_pretrained(
         BASE_MODEL, dtype=torch.bfloat16
     )
-    _attach(model, root)
+    _attach_conv(model, root, meta)
     if (root / "adapter_config.json").exists():
         model = PeftModel.from_pretrained(model, str(root))
     extra = root / "encoder_adapters.pt"
-    if extra.exists():
-        model.load_state_dict(torch.load(extra, map_location="cpu", weights_only=True), strict=False)
+    if extra.exists() and extra.stat().st_size > 2048:
+        model.load_state_dict(
+            torch.load(extra, map_location="cpu", weights_only=True), strict=False
+        )
     model.to(device).eval()
     return model, processor, device
 
@@ -105,7 +131,9 @@ def transcribe(
     out = model.generate(**inputs, max_new_tokens=128)
     chunk = inputs.get("audio_chunk_index") if hasattr(inputs, "get") else None
     try:
-        text = processor.decode(out, skip_special_tokens=True, audio_chunk_index=chunk, language=LANGUAGE)
+        text = processor.decode(
+            out, skip_special_tokens=True, audio_chunk_index=chunk, language=LANGUAGE
+        )
         if isinstance(text, (list, tuple)):
             text = text[0]
     except TypeError:
@@ -114,9 +142,13 @@ def transcribe(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Darija ASR (adapted Cohere Transcribe Arabic)")
+    parser = argparse.ArgumentParser(description="Darija ASR from a Hugging Face adapter")
     parser.add_argument("audio", help="wav / flac / ogg path")
-    parser.add_argument("--model", default=HUB_ID)
+    parser.add_argument(
+        "--model",
+        default="hybrid",
+        help="Hub id, local dir, or one of: " + ", ".join(MODELS),
+    )
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
     model, processor, device = load_model(args.model, args.device)

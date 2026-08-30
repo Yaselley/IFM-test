@@ -20,7 +20,16 @@
 
 I picked the Arabic Cohere card. Same size as multilingual Cohere (43.8 CER), much better on Darija. Qwen 1.7B is the one I would take if I needed an LLM-first fallback.
 
-Adapted checkpoint: [`01Yassine/cohere-transcribe-darija`](https://huggingface.co/01Yassine/cohere-transcribe-darija). `python infer.py clip.wav`
+Adapted checkpoints (all public):
+
+| recipe | Hub |
+| --- | --- |
+| hybrid | [`01Yassine/cohere-transcribe-darija`](https://huggingface.co/01Yassine/cohere-transcribe-darija) |
+| full LoRA | [`01Yassine/cohere-transcribe-darija-full-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-full-lora) |
+| encoder LoRA | [`01Yassine/cohere-transcribe-darija-encoder-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-encoder-lora) |
+| decoder LoRA | [`01Yassine/cohere-transcribe-darija-decoder-lora`](https://huggingface.co/01Yassine/cohere-transcribe-darija-decoder-lora) |
+
+`python infer.py clip.wav --model hybrid`
 
 MOSS is 5% Arabic script; its CER is not a transcription number. Whisper is not a starting point.
 

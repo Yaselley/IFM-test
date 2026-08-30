@@ -33,6 +33,4 @@ Adapted checkpoints (all public):
 
 MOSS is 5% Arabic script; its CER is not a transcription number. Whisper is not a starting point.
 
-Latency/RTF were measured on two GPUs (Whisper+Qwen on the ifm-asr node, Cohere/MOSS/MMS on a V100). Do not rank families by milliseconds.
-
 Full per-clip files: `benchmarks/zeroshot_atlasia/results/`. Rerun: `bash scripts/srun_zeroshot_atlasia.sh`.

@@ -16,7 +16,7 @@
 | moss-transcribe-0.9b | 908 | 95.7 | 99.0 | 0.061 | 354 |
 | mms-1b-all | 965 | 35.5 | 85.8 | 0.017 | 100 |
 | cohere-transcribe | 2066 | 43.8 | 77.6 | 0.057 | 334 |
-| **cohere-transcribe-arabic** | **2066** | **19.9** | **49.1** | **0.078** | **458** |
+| **cohere-transcribe-arabic** | **2066** | **20.2** | **49.1** | **0.078** | **458** |
 
 I picked the Arabic Cohere card. Same size as multilingual Cohere (43.8 CER), much better on Darija. Qwen 1.7B is the one I would take if I needed an LLM-first fallback.
 

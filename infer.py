@@ -2,10 +2,17 @@
 """Darija ASR from a Hugging Face adapter repo.
 
 The adapter repo holds LoRA (and MultiConv weights if hybrid). The 2B
-Cohere base is pulled automatically.
+Cohere base is pulled automatically. That base is **gated**: accept the
+license on the model card, then log in. The Darija adapters themselves
+are public.
+
+    # one-time
+    # 1. https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026
+    # 2. huggingface-cli login   OR   export HF_TOKEN=hf_...
+    #    (huggingface-cli login writes ~/.cache/huggingface/token)
 
     python infer.py clip.wav
-    python infer.py clip.wav --model hybrid
+    python infer.py --clip clip.wav --model hybrid
     python infer.py clip.wav --model 01Yassine/cohere-transcribe-darija-full-lora
 
     from infer import transcribe
@@ -18,6 +25,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +46,37 @@ MODELS = {
     "decoder_lora": "01Yassine/cohere-transcribe-darija-decoder-lora",
 }
 HUB_ID = MODELS["hybrid"]
+
+_GATED_HINT = (
+    "The Cohere base is gated. Accept the license at "
+    "https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026 "
+    "then `huggingface-cli login` or `export HF_TOKEN=hf_...`. "
+    "The 01Yassine/darija adapters are public; the token is only for the 2B base."
+)
+
+
+def _hf_token() -> str | None:
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        return token
+    for path in (
+        Path(os.environ.get("HF_HOME", "")) / "token" if os.environ.get("HF_HOME") else None,
+        Path("/netscratch/yelkheir/.cache/huggingface/token"),
+        Path.home() / ".cache/huggingface/token",
+    ):
+        if path is not None and path.is_file():
+            text = path.read_text().strip()
+            if text:
+                return text
+    return None
+
+
+def _hub_kw(**extra) -> dict:
+    kw = dict(extra)
+    token = _hf_token()
+    if token:
+        kw["token"] = token
+    return kw
 
 
 def _load_wav(path: str) -> np.ndarray:
@@ -62,7 +101,10 @@ def _snapshot(model_id: str) -> Path:
         return local.resolve()
     from huggingface_hub import snapshot_download
 
-    return Path(snapshot_download(resolve_id(model_id)))
+    try:
+        return Path(snapshot_download(resolve_id(model_id), **_hub_kw()))
+    except Exception as exc:
+        raise SystemExit(f"{exc}\n\n{_GATED_HINT}") from exc
 
 
 def _attach_conv(model, root: Path, meta: dict) -> None:
@@ -96,10 +138,16 @@ def load_model(model_id: str = HUB_ID, device: str | None = None):
     meta_path = root / "adapter_meta.json"
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
 
-    processor = AutoProcessor.from_pretrained(BASE_MODEL)
-    model = CohereAsrForConditionalGeneration.from_pretrained(
-        BASE_MODEL, dtype=torch.bfloat16
-    )
+    try:
+        processor = AutoProcessor.from_pretrained(BASE_MODEL, **_hub_kw())
+        model = CohereAsrForConditionalGeneration.from_pretrained(
+            BASE_MODEL, dtype=torch.bfloat16, **_hub_kw()
+        )
+    except Exception as exc:
+        msg = str(exc)
+        if any(s in msg.lower() for s in ("401", "403", "gated", "authorized", "token")):
+            raise SystemExit(f"{exc}\n\n{_GATED_HINT}") from exc
+        raise
     _attach_conv(model, root, meta)
     if (root / "adapter_config.json").exists():
         model = PeftModel.from_pretrained(model, str(root))
@@ -143,7 +191,8 @@ def transcribe(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Darija ASR from a Hugging Face adapter")
-    parser.add_argument("audio", help="wav / flac / ogg path")
+    parser.add_argument("audio", nargs="?", help="wav / flac / ogg path")
+    parser.add_argument("--clip", default=None, help="same as the positional audio path")
     parser.add_argument(
         "--model",
         default="hybrid",
@@ -151,8 +200,17 @@ def main() -> None:
     )
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
+    clip = args.clip or args.audio
+    if not clip:
+        parser.error("pass a wav path, or --clip path.wav")
+    if not _hf_token():
+        print(
+            "warning: no HF token found. The Darija adapters are public, but "
+            f"{BASE_MODEL} is gated.\n{_GATED_HINT}",
+            file=sys.stderr,
+        )
     model, processor, device = load_model(args.model, args.device)
-    print(transcribe(args.audio, model=model, processor=processor, device=device))
+    print(transcribe(clip, model=model, processor=processor, device=device))
 
 
 if __name__ == "__main__":

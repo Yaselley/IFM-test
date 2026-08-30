@@ -21,8 +21,11 @@ Writeup: [notebook.ipynb](notebook.ipynb) · [zero-shot](reports/zeroshot.md) ·
 
 ## Inference from Hugging Face
 
+The Darija adapters are public. The 2B base [`CohereLabs/cohere-transcribe-arabic-07-2026`](https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026) is **gated**. Accept the license on that card, then log in (`huggingface-cli login` or `export HF_TOKEN=hf_...`). Without a token, `from_pretrained` returns 401/403.
+
 ```bash
 pip install "transformers>=5.4" peft torch torchaudio soundfile huggingface_hub
+huggingface-cli login
 ```
 
 No local checkpoint needed:
@@ -39,7 +42,7 @@ print(transcribe("clip.wav", model_id="full_lora"))
 From this repo:
 
 ```bash
-python infer.py clip.wav                      # hybrid
+python infer.py --clip clip.wav               # hybrid
 python infer.py clip.wav --model full_lora
 python infer.py clip.wav --model encoder_lora
 python infer.py clip.wav --model decoder_lora

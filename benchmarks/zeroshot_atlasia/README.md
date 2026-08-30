@@ -55,13 +55,6 @@ This is [atlasia/darija-asr-benchmark](https://huggingface.co/datasets/atlasia/d
   - `cohere-transcribe` — 2B Conformer, 14 languages including Arabic. Needs newer transformers.
   - `cohere-transcribe-arabic` — Same 2B, trained for dialects and Arabic–English code-switch.
 
-## What we left out
-
-- `seamless-m4t-v2-large` (`facebook/seamless-m4t-v2-large`) — Heavy download, different API. Next if time.
-- `sensevoice-small` (`FunAudioLLM/SenseVoiceSmall`) — Fast multilingual. FunASR stack, not transformers-native here.
-
-Other names that would be fair later: `FunAudioLLM/SenseVoiceSmall`, `nvidia/canary-1b-flash`, `facebook/seamless-m4t-v2-large`.
-
 ## Files
 
 ```

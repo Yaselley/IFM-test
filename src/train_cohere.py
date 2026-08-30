@@ -808,7 +808,7 @@ def main() -> None:
         f"recipe={args.recipe} conv_adapter={recipe['conv_adapter']} lora_scope={recipe['lora_scope']}\n"
         "model=CohereLabs/cohere-transcribe-arabic-07-2026\n"
         f"{enc_line}{dec_line}"
-        "lr=1e-4 encoder / 5e-4 decoder LoRA\n"
+        "lr=1e-4 encoder adapter and decoder LoRA\n"
         "opt=AdamW betas=(0.9, 0.98) cosine 10% warmup\n"
         "precision=bf16 (fp16 fallback) + grad checkpoint + tf32\n"
         "aug=speed{0.9,1.0,1.1} gain±3dB drop-chunk SpecAugment + MUSAN 25% + RIR 25%\n"

@@ -57,7 +57,7 @@ COHERE_ADAPTER = dict(
 )
 
 COHERE_TRAIN = dict(
-    decoder_lr=5e-4,
+    decoder_lr=1e-4,
     encoder_adapter_lr=1e-4,
     warmup_ratio=0.10,
     per_device_train_batch_size=8,

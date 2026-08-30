@@ -6,7 +6,7 @@ Student base: `CohereLabs/cohere-transcribe-arabic-07-2026`. Freeze the Conforme
 
 ## Why hybrid (MultiConv + LoRA)
 
-- Zero-shot is already 20.2 CER on AtlasIA. A high LR wipes that. Adapters 1e-4, decoder LoRA 5e-4. Not 1e-3.
+- Zero-shot is already 20.2 CER on AtlasIA. A high LR wipes that. Adapter and decoder LoRA both 1e-4. Not 1e-3.
 - Mismatch is temporal (rate, gemination, French bursts) → conv adapter, not LoRA on the Conformer. Kernels 7/15/23/31 from MULTI-CONVFORMER (my paper: https://arxiv.org/abs/2510.24852). Skip the bottom third of layers.
 - Decoder LoRA r=32 on q/k/v/o (self-attn + cross-attn). No MLP, no embed — 3h of Gemini overfits spelling there.
 - Train audio is PESQ > 2.5. AtlasIA is not. Keep SpeechBrain-style speed/gain/drop + SpecAugment on every clip. Add MUSAN and RIR at 25%. No MUSAN speech.

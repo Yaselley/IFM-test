@@ -1,6 +1,6 @@
 # Zero-shot atlasia/darija-asr-benchmark
 
-114 clips, 0.18 h, human Darija labels from [`atlasia/darija-asr-benchmark`](https://huggingface.co/datasets/atlasia/darija-asr-benchmark). Same `src/normalize.py` for everyone. **CER** is the number that matters — Darija spelling is not fixed. n=114 is small; a couple of CER points is noise.
+114 clips, 0.18 h, human Darija labels from [`atlasia/darija-asr-benchmark`](https://huggingface.co/datasets/atlasia/darija-asr-benchmark). Same `src/normalize.py` for everyone. **CER** is the number that matters, Darija spelling is not fixed. n=114 is small; a couple of CER points is noise.
 
 | model | params | CER | WER | RTF | lat ms |
 | --- | ---: | ---: | ---: | ---: | ---: |

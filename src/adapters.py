@@ -1,7 +1,6 @@
 """Residual MultiConvAdapter on the frozen Cohere Conformer.
 
-Kernels K={7,15,23,31} + concat_fusion from MULTI-CONVFORMER
-(Prabhu et al. 2024). Skip the bottom third of layers. Zero-init the
+Kernels K={7,15,23,31} + concat_fusion from MULTIConvAdapter. Skip the bottom third of layers. Zero-init the
 up-projection so the first step is identity.
 """
 
